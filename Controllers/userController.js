@@ -13,11 +13,15 @@ const registerUser = async (req, res) => {
     const { name, email, password } = req.body;
     let user = await userModel.findOne({ email });
     if (user)
-      return res.status(400).json("User with the given email already exist");
+      return res
+        .status(400)
+        .json({ message: "User with the given email already exist" });
     if (!name || !email || !password)
-      return res.status(400).json("All the field are required");
+      return res.status(400).json({ message: "All the field are required" });
     if (!validator.isEmail(email))
-      return res.status(400).json("Email should be the valid email");
+      return res
+        .status(400)
+        .json({ message: "Email should be the valid email" });
     user = new userModel({ name, email, password });
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(user.password, salt);
@@ -25,9 +29,49 @@ const registerUser = async (req, res) => {
     const token = createToken(user._id);
     res.status(201).json({ _id: user._id, name, email, token });
   } catch (error) {
-    console.log(error);
+    // console.log(error);
     res.status(500).json(error);
   }
 };
 
-module.exports = { registerUser };
+const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    let user = await userModel.findOne({ email });
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword)
+      return res.status(400).json({ message: "Password didn't match" });
+    const token = createToken(user._id);
+    return res
+      .status(200)
+      .json({ _id: user._id, name: user.name, email, token });
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
+
+const findUser = async (req, res) => {
+  const userId = req.params.userId;
+  try {
+    const user = await userModel.findById(userId).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    return res.status(200).json(user);
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+
+const getUsers = async (req, res) => {
+  try {
+    const users = await userModel.find().select("-password");
+    return res.status(200).json(users);
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+
+module.exports = { registerUser, loginUser, findUser, getUsers };
